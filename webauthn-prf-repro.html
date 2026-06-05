@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>WebAuthn PRF Repro</title>
+    </head>
+    <body>
+        <button id="create">1. Create credential</button>
+        <button id="get">2. Get PRF result</button>
+        <pre id="output"></pre>
+
+        <script>
+            const output = document.getElementById("output");
+
+            function write(value) {
+                output.textContent += `${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n`;
+                console.log(value);
+            }
+
+            function isBufferSourceText(value, name) {
+                const isBufferSource =
+                    value instanceof ArrayBuffer || ArrayBuffer.isView(value);
+                return isBufferSource
+                    ? `✅ ${name} is a BufferSource`
+                    : `🚫 ${name} is NOT a BufferSource`;
+            }
+
+            function describeValue(value) {
+                return {
+                    constructor: value?.constructor?.name,
+                    isArray: Array.isArray(value),
+                    isArrayBuffer: value instanceof ArrayBuffer,
+                    isArrayBufferView: ArrayBuffer.isView(value),
+                    objectString: Object.prototype.toString.call(value),
+                    length: value?.byteLength ?? value?.length,
+                };
+            }
+
+            document
+                .getElementById("create")
+                .addEventListener("click", async () => {
+                    const credential = await navigator.credentials.create({
+                        publicKey: {
+                            challenge: new Uint8Array([1]),
+                            rp: { name: "PRF Repro" },
+                            user: {
+                                id: new Uint8Array([1]),
+                                name: "user",
+                                displayName: "User",
+                            },
+                            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+                            extensions: { prf: {} },
+                        },
+                    });
+                });
+
+            document
+                .getElementById("get")
+                .addEventListener("click", async () => {
+                    const credential = await navigator.credentials.get({
+                        publicKey: {
+                            challenge: new Uint8Array([2]),
+                            allowCredentials: [],
+                            extensions: {
+                                prf: {
+                                    eval: {
+                                        first: new Uint8Array([3]),
+                                        second: new Uint8Array([4]),
+                                    },
+                                },
+                            },
+                            userVerification: "required",
+                        },
+                    });
+
+                    const results =
+                        credential.getClientExtensionResults().prf?.results;
+
+                    write(isBufferSourceText(results?.first, "first"));
+                    write(isBufferSourceText(results?.second, "second"));
+                    write({
+                        first: describeValue(results?.first),
+                        second: describeValue(results?.second),
+                    });
+                });
+        </script>
+    </body>
+</html>
